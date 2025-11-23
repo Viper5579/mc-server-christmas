@@ -4,6 +4,7 @@
 # Minecraft Christmas Server - Interactive Setup Script
 # Version: 1.21.10
 # World Seed: -123456793079414942
+# Optimized for: Amazon Linux on t4g.medium (ARM64/Graviton2)
 ###############################################################################
 
 set -e  # Exit on error
@@ -45,6 +46,9 @@ echo "  ✓ Web-based GUI Control Panel"
 echo "  ✓ Auto-shutdown system (saves money!)"
 echo "  ✓ Easy mod installation system"
 echo ""
+echo -e "${CYAN}Platform: Amazon Linux (ARM64)${NC}"
+echo -e "${CYAN}Instance: t4g.medium (Graviton2)${NC}"
+echo ""
 echo -e "${YELLOW}Estimated time: 15-20 minutes${NC}"
 echo ""
 
@@ -56,6 +60,18 @@ if [[ ! $REPLY =~ ^[Yy]$ ]]; then
     exit 1
 fi
 
+# Detect package manager
+if command -v dnf &> /dev/null; then
+    PKG_MGR="dnf"
+elif command -v yum &> /dev/null; then
+    PKG_MGR="yum"
+else
+    echo -e "${RED}Error: Neither dnf nor yum found. Are you running Amazon Linux?${NC}"
+    exit 1
+fi
+
+echo -e "${CYAN}Detected package manager: $PKG_MGR${NC}"
+
 ###############################################################################
 # Step 1: System Update
 ###############################################################################
@@ -66,9 +82,9 @@ echo -e "${GREEN}Step 1: Updating System Packages${NC}"
 echo -e "${CYAN}========================================${NC}"
 echo ""
 
-sudo apt-get update -y
-sudo apt-get upgrade -y
-sudo apt-get install -y wget curl unzip screen htop net-tools
+sudo $PKG_MGR update -y
+sudo $PKG_MGR upgrade -y
+sudo $PKG_MGR install -y wget curl unzip screen htop net-tools git tar gzip
 
 echo -e "${GREEN}✓ System updated successfully${NC}"
 
@@ -78,7 +94,7 @@ echo -e "${GREEN}✓ System updated successfully${NC}"
 
 echo ""
 echo -e "${CYAN}========================================${NC}"
-echo -e "${GREEN}Step 2: Installing Java 21${NC}"
+echo -e "${GREEN}Step 2: Installing Java 21 (Amazon Corretto)${NC}"
 echo -e "${CYAN}========================================${NC}"
 echo ""
 
@@ -87,16 +103,17 @@ if command -v java &> /dev/null; then
     if [ "$JAVA_VERSION" -ge 21 ]; then
         echo -e "${GREEN}✓ Java 21+ already installed${NC}"
     else
-        echo "Installing Java 21..."
-        sudo apt-get install -y openjdk-21-jdk
+        echo "Installing Amazon Corretto 21 (optimized for ARM64)..."
+        sudo $PKG_MGR install -y java-21-amazon-corretto-devel
     fi
 else
-    echo "Installing Java 21..."
-    sudo apt-get install -y openjdk-21-jdk
+    echo "Installing Amazon Corretto 21 (optimized for ARM64)..."
+    sudo $PKG_MGR install -y java-21-amazon-corretto-devel
 fi
 
 java -version
 echo -e "${GREEN}✓ Java installed successfully${NC}"
+echo -e "${CYAN}Note: Using Amazon Corretto for optimal ARM64 performance${NC}"
 
 ###############################################################################
 # Step 3: Create Minecraft Directory
@@ -206,16 +223,18 @@ echo ""
 cat > "$MC_DIR/start.sh" << 'STARTSCRIPT'
 #!/bin/bash
 # Minecraft Server Start Script
+# Optimized for t4g.medium (ARM64/Graviton2)
 
 # Memory allocation (adjust based on your instance)
-# t3.medium (4GB RAM) = -Xmx3G
-# t3.large (8GB RAM) = -Xmx6G
+# t4g.medium (4GB RAM) = -Xmx3G (leaving 1GB for OS)
+# t4g.large (8GB RAM) = -Xmx6G
+# t4g.xlarge (16GB RAM) = -Xmx14G
 RAM="3G"
 
 # Find forge jar
 FORGE_JAR=$(ls -1 forge-*-*.jar | grep -v installer | head -n 1)
 
-# Start server
+# Start server with optimized flags for ARM64/Graviton2
 java -Xms1G -Xmx$RAM \
   -XX:+UseG1GC \
   -XX:+ParallelRefProcEnabled \
@@ -289,8 +308,8 @@ echo
 if [[ $REPLY =~ ^[Yy]$ ]]; then
     echo "Installing Crafty Controller..."
 
-    # Install dependencies
-    sudo apt-get install -y python3 python3-pip python3-venv
+    # Install dependencies (Amazon Linux package names)
+    sudo $PKG_MGR install -y python3 python3-pip python3-devel
 
     # Download and install Crafty
     cd "$HOME"
@@ -368,8 +387,9 @@ Restart=always
 WantedBy=multi-user.target
 MONITORSERVICE
 
-    # Install mcrcon
-    sudo apt-get install -y build-essential
+    # Install mcrcon (Amazon Linux uses 'Development Tools' group)
+    sudo $PKG_MGR groupinstall -y "Development Tools"
+    sudo $PKG_MGR install -y gcc make
     cd /tmp
     git clone https://github.com/Tiiffi/mcrcon.git
     cd mcrcon
@@ -395,12 +415,27 @@ echo -e "${GREEN}Step 11: Configuring Firewall${NC}"
 echo -e "${CYAN}========================================${NC}"
 echo ""
 
-sudo ufw allow 25565/tcp  # Minecraft
-sudo ufw allow 8443/tcp   # Crafty GUI
-sudo ufw allow 22/tcp     # SSH
-echo "y" | sudo ufw enable
+# Amazon Linux uses firewalld, but AWS Security Groups are primary firewall
+# These are backup firewall rules on the instance itself
 
-echo -e "${GREEN}✓ Firewall configured${NC}"
+if command -v firewall-cmd &> /dev/null; then
+    echo "Configuring firewalld..."
+    sudo systemctl start firewalld
+    sudo systemctl enable firewalld
+    sudo firewall-cmd --permanent --add-port=25565/tcp  # Minecraft
+    sudo firewall-cmd --permanent --add-port=8443/tcp   # Crafty GUI
+    sudo firewall-cmd --permanent --add-port=22/tcp     # SSH
+    sudo firewall-cmd --reload
+    echo -e "${GREEN}✓ Firewalld configured${NC}"
+else
+    echo -e "${YELLOW}! Firewalld not found, relying on AWS Security Groups${NC}"
+    echo -e "${YELLOW}! Make sure your EC2 Security Group allows ports:${NC}"
+    echo -e "${YELLOW}  - 25565/tcp (Minecraft)${NC}"
+    echo -e "${YELLOW}  - 8443/tcp (GUI)${NC}"
+    echo -e "${YELLOW}  - 22/tcp (SSH)${NC}"
+fi
+
+echo -e "${CYAN}Note: AWS Security Groups are your primary firewall${NC}"
 
 ###############################################################################
 # First Run

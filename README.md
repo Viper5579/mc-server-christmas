@@ -4,11 +4,13 @@
 This repository contains everything you need to set up a fully-featured Minecraft server on AWS with:
 - **Version**: Minecraft Java Edition 1.21.10
 - **World Seed**: -123456793079414942
+- **Platform**: Amazon Linux 2023 on t4g.medium (ARM64/Graviton2)
 - **Resource Pack**: Christmas Mashup
 - **GUI Management**: Web-based control panel
 - **Easy Modding**: Forge mod loader support
 - **Auto Shutdown/Startup**: Saves money when no one is playing
 - **Minimal Terminal Work**: Interactive setup scripts
+- **Optimized for ARM64**: Uses Amazon Corretto Java for best performance
 
 ---
 
@@ -46,10 +48,12 @@ Before starting, you'll need:
 3. **SSH Client** - Built into Mac/Linux, use PuTTY on Windows
 4. **Minecraft Java Edition** - Version 1.21.10 compatible
 
-### AWS Cost Estimate
-- **t3.medium instance** (~$30/month if running 24/7)
-- **With auto-shutdown**: ~$5-15/month depending on usage
+### AWS Cost Estimate (t4g.medium - ARM64/Graviton2)
+- **t4g.medium instance** (~$24/month if running 24/7) - 20% cheaper than t3!
+- **With auto-shutdown**: ~$4-12/month depending on usage
 - **Storage**: ~$1-2/month
+- **Total with auto-shutdown**: ~$5-14/month
+- **Savings vs always-on**: Up to 80%!
 
 ---
 
@@ -61,9 +65,11 @@ Before starting, you'll need:
 2. **Click "Launch Instance"**
 3. **Configure Instance**:
    - **Name**: `minecraft-christmas-server`
-   - **AMI**: Ubuntu Server 22.04 LTS
-   - **Instance Type**: `t3.medium` (2 vCPU, 4GB RAM)
-     - For more players: `t3.large` (2 vCPU, 8GB RAM)
+   - **AMI**: Amazon Linux 2023 AMI (ARM64)
+     - Search for "Amazon Linux 2023" and select the **ARM64** version
+   - **Instance Type**: `t4g.medium` (2 vCPU, 4GB RAM, ARM64/Graviton2)
+     - For more players: `t4g.large` (2 vCPU, 8GB RAM)
+     - Or: `t4g.xlarge` (4 vCPU, 16GB RAM)
    - **Key Pair**: Create new or use existing (SAVE THIS FILE!)
    - **Storage**: 20 GB gp3
 
@@ -71,7 +77,7 @@ Before starting, you'll need:
    - Create security group with these rules:
      - SSH (22) - Your IP only
      - Custom TCP (25565) - Anywhere (Minecraft)
-     - Custom TCP (8080) - Your IP only (Web GUI)
+     - Custom TCP (8443) - Your IP only (Web GUI)
      - Custom TCP (25575) - Your IP only (RCON)
 
 5. **Click "Launch Instance"**
@@ -87,8 +93,10 @@ Before starting, you'll need:
 
 ```bash
 chmod 400 your-key-pair.pem
-ssh -i "your-key-pair.pem" ubuntu@YOUR-ELASTIC-IP
+ssh -i "your-key-pair.pem" ec2-user@YOUR-ELASTIC-IP
 ```
+
+**Note**: Amazon Linux uses `ec2-user` as the default user (not `ubuntu`)
 
 ---
 
@@ -171,7 +179,7 @@ This server uses **Forge 1.21.10** for easy modding!
 
 ```bash
 # Upload mod to server
-scp -i your-key.pem mod-file.jar ubuntu@YOUR-IP:~/minecraft/mods/
+scp -i your-key.pem mod-file.jar ec2-user@YOUR-IP:~/minecraft/mods/
 
 # Restart server
 sudo systemctl restart minecraft
@@ -207,7 +215,7 @@ The Christmas Mashup Pack adds festive textures to your world!
 ```bash
 # Via GUI: Files → resource-packs → Upload
 # Or via command:
-scp -i your-key.pem christmas-mashup.zip ubuntu@YOUR-IP:~/minecraft/resource-packs/
+scp -i your-key.pem christmas-mashup.zip ec2-user@YOUR-IP:~/minecraft/resource-packs/
 ```
 
 3. **Configure server** (already done if using our config):
@@ -295,11 +303,13 @@ sudo chown -R ubuntu:ubuntu ~/minecraft
 1. **Check security group** - Port 25565 should be open
 2. **Check server is running**: `sudo systemctl status minecraft`
 3. **Verify IP address** - Use Elastic IP, not public IP
-4. **Check firewall**:
+4. **Check firewall** (Amazon Linux uses firewalld):
 ```bash
-sudo ufw status
-sudo ufw allow 25565/tcp
+sudo firewall-cmd --list-all
+sudo firewall-cmd --permanent --add-port=25565/tcp
+sudo firewall-cmd --reload
 ```
+**Note**: AWS Security Groups are your primary firewall - check those first!
 
 ### GUI Not Loading
 
@@ -336,7 +346,7 @@ sudo systemctl restart minecraft
 
 - **Check server TPS**: Type `/tps` in console
 - **Reduce view distance**: Edit `server.properties` → `view-distance=8`
-- **Upgrade instance**: Switch to t3.large
+- **Upgrade instance**: Switch to t4g.large (8GB RAM, still ARM64)
 
 ---
 
@@ -428,14 +438,16 @@ This setup guide and scripts are provided as-is for personal use. Minecraft and 
 ## Quick Reference
 
 **Server IP**: `YOUR-ELASTIC-IP:25565`
-**GUI URL**: `http://YOUR-ELASTIC-IP:8080`
+**GUI URL**: `https://YOUR-ELASTIC-IP:8443`
 **World Seed**: `-123456793079414942`
 **Version**: Minecraft Java Edition 1.21.10
 **Mod Loader**: Forge 1.21.10
+**Platform**: Amazon Linux 2023 (ARM64)
+**Instance**: t4g.medium (Graviton2)
 
 **Estimated Setup Time**: 30-45 minutes
 **Difficulty**: Easy (with automatic script)
-**Cost**: $5-30/month depending on usage
+**Cost**: $5-24/month depending on usage (20% cheaper with ARM64!)
 
 ---
 

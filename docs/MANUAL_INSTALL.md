@@ -2,11 +2,14 @@
 
 This guide provides step-by-step manual installation instructions if you prefer not to use the automated `setup.sh` script.
 
+**Platform**: Amazon Linux 2023 on t4g.medium (ARM64/Graviton2)
+
 ---
 
 ## Prerequisites
 
-- AWS EC2 instance running Ubuntu 22.04
+- AWS EC2 instance running Amazon Linux 2023 (ARM64)
+- Instance type: t4g.medium or larger
 - SSH access to the instance
 - Basic command line knowledge
 
@@ -16,30 +19,38 @@ This guide provides step-by-step manual installation instructions if you prefer 
 
 ```bash
 chmod 400 your-key-pair.pem
-ssh -i "your-key-pair.pem" ubuntu@YOUR-ELASTIC-IP
+ssh -i "your-key-pair.pem" ec2-user@YOUR-ELASTIC-IP
 ```
+
+**Note**: Amazon Linux uses `ec2-user` as the default user
 
 ---
 
 ## Step 2: Update System
 
 ```bash
-sudo apt-get update -y
-sudo apt-get upgrade -y
-sudo apt-get install -y wget curl unzip screen htop net-tools build-essential git
+# Amazon Linux 2023 uses dnf (Amazon Linux 2 uses yum - both work)
+sudo dnf update -y
+sudo dnf upgrade -y
+sudo dnf install -y wget curl unzip screen htop net-tools git tar gzip
 ```
+
+**Note**: Amazon Linux 2023 uses `dnf`, Amazon Linux 2 uses `yum`. Both commands work on both versions.
 
 ---
 
-## Step 3: Install Java 21
+## Step 3: Install Java 21 (Amazon Corretto)
 
 ```bash
-sudo apt-get install -y openjdk-21-jdk
+# Install Amazon Corretto 21 (optimized for ARM64/Graviton2)
+sudo dnf install -y java-21-amazon-corretto-devel
 
 # Verify installation
 java -version
-# Should show version 21.x.x
+# Should show "Corretto-21.x.x" - Amazon's optimized OpenJDK
 ```
+
+**Why Corretto?** Amazon Corretto is optimized for ARM64/Graviton2 and provides better performance on t4g instances.
 
 ---
 
@@ -180,6 +191,11 @@ sudo systemctl enable minecraft
 ## Step 11: Install MCRCON (for auto-shutdown)
 
 ```bash
+# Install development tools for compiling
+sudo dnf groupinstall -y "Development Tools"
+sudo dnf install -y gcc make
+
+# Clone and build mcrcon
 cd /tmp
 git clone https://github.com/Tiiffi/mcrcon.git
 cd mcrcon
@@ -257,18 +273,27 @@ sudo systemctl enable minecraft-autoshutdown
 ## Step 14: Configure Firewall
 
 ```bash
-# Enable UFW firewall
-sudo ufw allow 22/tcp      # SSH
-sudo ufw allow 25565/tcp   # Minecraft
-sudo ufw allow 25575/tcp   # RCON (only from localhost)
-sudo ufw allow 8443/tcp    # Crafty GUI (if installing)
+# Amazon Linux uses firewalld (but AWS Security Groups are primary)
+# These are backup firewall rules on the instance itself
 
-# Enable firewall
-echo "y" | sudo ufw enable
+# Start and enable firewalld
+sudo systemctl start firewalld
+sudo systemctl enable firewalld
+
+# Open ports
+sudo firewall-cmd --permanent --add-port=22/tcp       # SSH
+sudo firewall-cmd --permanent --add-port=25565/tcp    # Minecraft
+sudo firewall-cmd --permanent --add-port=25575/tcp    # RCON
+sudo firewall-cmd --permanent --add-port=8443/tcp     # Crafty GUI
+
+# Reload firewall
+sudo firewall-cmd --reload
 
 # Check status
-sudo ufw status
+sudo firewall-cmd --list-all
 ```
+
+**Important**: AWS Security Groups are your primary firewall. Make sure you configured those when creating the EC2 instance!
 
 ---
 
@@ -322,8 +347,8 @@ mcrcon -H localhost -P 25575 -p "$RCON_PASSWORD" "op YOUR_USERNAME"
 ## Optional: Install Crafty Controller GUI
 
 ```bash
-# Install dependencies
-sudo apt-get install -y python3 python3-pip python3-venv
+# Install dependencies (Amazon Linux package names)
+sudo dnf install -y python3 python3-pip python3-devel
 
 # Download installer
 cd ~
@@ -336,7 +361,7 @@ chmod +x crafty-installer.sh
 sudo ./crafty-installer.sh
 
 # Follow prompts:
-# - Install directory: /home/ubuntu/crafty
+# - Install directory: /home/ec2-user/crafty
 # - Create admin user
 # - Set admin password
 
@@ -349,7 +374,7 @@ sudo ./crafty-installer.sh
 
 ```bash
 # Install nginx
-sudo apt-get install -y nginx
+sudo dnf install -y nginx
 
 # Create directory
 sudo mkdir -p /var/www/html/resourcepacks
@@ -357,12 +382,13 @@ sudo chmod 755 /var/www/html/resourcepacks
 
 # Upload your resource pack
 # (from local machine)
-# scp -i your-key.pem pack.zip ubuntu@YOUR-IP:/tmp/
+# scp -i your-key.pem pack.zip ec2-user@YOUR-IP:/tmp/
 # Then move it:
 # sudo mv /tmp/pack.zip /var/www/html/resourcepacks/
 
-# Allow HTTP traffic
-sudo ufw allow 80/tcp
+# Allow HTTP traffic through firewalld
+sudo firewall-cmd --permanent --add-port=80/tcp
+sudo firewall-cmd --reload
 
 # Start nginx
 sudo systemctl start nginx
@@ -596,12 +622,13 @@ sudo systemctl restart minecraft
 # Check server is running
 sudo systemctl status minecraft
 
-# Check firewall
-sudo ufw status
-sudo ufw allow 25565/tcp
+# Check firewall (Amazon Linux uses firewalld)
+sudo firewall-cmd --list-all
+sudo firewall-cmd --permanent --add-port=25565/tcp
+sudo firewall-cmd --reload
 
-# Check AWS security group
-# - Port 25565 should be open to 0.0.0.0/0
+# Check AWS security group (this is more important!)
+# - Port 25565 should be open to 0.0.0.0/0 in Security Group
 
 # Check public IP
 curl ifconfig.me

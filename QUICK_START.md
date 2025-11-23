@@ -2,6 +2,8 @@
 
 Get your Christmas Minecraft server running in under 30 minutes!
 
+**Platform**: Amazon Linux 2023 on t4g.medium (ARM64/Graviton2)
+
 ---
 
 ## ⚡ Super Quick Setup
@@ -12,8 +14,8 @@ Get your Christmas Minecraft server running in under 30 minutes!
 2. Click "Launch Instance"
 3. Settings:
    - Name: `minecraft-christmas`
-   - OS: Ubuntu 22.04 LTS
-   - Instance: `t3.medium`
+   - OS: **Amazon Linux 2023 AMI (ARM64)**
+   - Instance: **t4g.medium** (ARM64/Graviton2)
    - Storage: 20GB
    - Security: Open ports 22, 25565, 8443
 4. Create/download key pair
@@ -28,15 +30,15 @@ Get your Christmas Minecraft server running in under 30 minutes!
 ### 3. Connect & Install (20 minutes)
 
 ```bash
-# Connect
+# Connect (Amazon Linux uses ec2-user, not ubuntu)
 chmod 400 your-key.pem
-ssh -i your-key.pem ubuntu@YOUR-ELASTIC-IP
+ssh -i your-key.pem ec2-user@YOUR-ELASTIC-IP
 
 # Clone repo
 git clone https://github.com/Viper5579/mc-server-christmas.git
 cd mc-server-christmas
 
-# Run installer
+# Run installer (optimized for Amazon Linux + ARM64)
 chmod +x setup.sh
 ./setup.sh
 ```
@@ -91,7 +93,7 @@ sudo journalctl -u minecraft -f
 # Open https://YOUR-IP:8443 → Files → mods → Upload
 
 # Or upload mod via command
-scp -i key.pem mod.jar ubuntu@YOUR-IP:~/minecraft/mods/
+scp -i key.pem mod.jar ec2-user@YOUR-IP:~/minecraft/mods/
 ```
 
 ---
@@ -105,11 +107,12 @@ scp -i key.pem mod.jar ubuntu@YOUR-IP:~/minecraft/mods/
 
 ---
 
-## 💰 Monthly Cost
+## 💰 Monthly Cost (t4g.medium ARM64)
 
-- **Without auto-shutdown**: ~$30/month
-- **With auto-shutdown**: ~$5-15/month
+- **Without auto-shutdown**: ~$24/month (20% cheaper than t3!)
+- **With auto-shutdown**: ~$4-12/month
 - **Savings**: Up to 83%!
+- **ARM64 Bonus**: Better performance per dollar!
 
 ---
 
